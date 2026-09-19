@@ -1,6 +1,7 @@
 {
-  "auto_update": false,
+  "auto_update": true,
   "disable_ai": true,
+  "server_url": "https://updates.burton.dev",
   "telemetry": {
     "diagnostics": false,
     "metrics": false

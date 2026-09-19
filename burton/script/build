@@ -2,28 +2,150 @@
 # Apply Burton branding in a disposable git worktree, then build.
 #
 # Usage:
-#   burton/script/build                 # cargo build -p zed
+#   burton/script/build
 #   burton/script/build --release
-#   burton/script/build -- bundle-linux
+#   burton/script/build bundle-linux
+#   burton/script/build bundle-mac
+#   burton/script/build bundle-windows
+#   burton/script/build --channel preview bundle-linux
 #   burton/script/build -- scan
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+CHANNEL=""
 MODE="build"
 PASS_THROUGH=()
-if [[ "${1:-}" == "--" ]]; then
-  shift
-  if [[ "${1:-}" == "bundle-linux" ]]; then
-    MODE="bundle-linux"
-    shift
-  elif [[ "${1:-}" == "scan" ]]; then
-    MODE="scan"
-    shift
-  fi
+
+consume_mode_or_passthrough() {
+  local arg="$1"
+  case "$arg" in
+    bundle-linux|bundle-mac|bundle-windows|scan)
+      if [[ "$MODE" == "build" ]]; then
+        MODE="$arg"
+      else
+        PASS_THROUGH+=("$arg")
+      fi
+      ;;
+    *)
+      PASS_THROUGH+=("$arg")
+      ;;
+  esac
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --channel)
+      CHANNEL="${2:?--channel requires a value}"
+      shift 2
+      ;;
+    --)
+      shift
+      while [[ $# -gt 0 ]]; do
+        if [[ "$1" == "--channel" ]]; then
+          CHANNEL="${2:?--channel requires a value}"
+          shift 2
+          continue
+        fi
+        consume_mode_or_passthrough "$1"
+        shift
+      done
+      break
+      ;;
+    bundle-linux|bundle-mac|bundle-windows|scan)
+      consume_mode_or_passthrough "$1"
+      shift
+      ;;
+    *)
+      PASS_THROUGH+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$CHANNEL" && "$MODE" == bundle-* ]]; then
+  CHANNEL="stable"
 fi
-PASS_THROUGH+=("$@")
+
+is_windows() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) return 0 ;;
+  esac
+  [[ "${OS:-}" == "Windows_NT" ]]
+}
+
+require_os() {
+  local needed="$1"
+  local actual
+  actual="$(uname -s)"
+  case "$needed" in
+    linux)
+      [[ "$actual" == Linux ]] || {
+        echo "bundle-linux must run on Linux (got ${actual})." >&2
+        exit 2
+      }
+      ;;
+    mac)
+      [[ "$actual" == Darwin ]] || {
+        echo "bundle-mac must run on macOS (got ${actual})." >&2
+        exit 2
+      }
+      ;;
+    windows)
+      is_windows || {
+        echo "bundle-windows must run on Windows (got ${actual})." >&2
+        exit 2
+      }
+      ;;
+  esac
+}
+
+case "$MODE" in
+  bundle-linux) require_os linux ;;
+  bundle-mac) require_os mac ;;
+  bundle-windows) require_os windows ;;
+esac
+
+copy_artifacts() {
+  local dest="$ROOT/target"
+  mkdir -p "$dest"
+  python3 - "$WORKTREE" "$ROOT" "$dest" <<'PY'
+import shutil
+import sys
+from pathlib import Path
+
+worktree, root, dest = map(Path, sys.argv[1:])
+patterns = (
+    "target/release/burton-linux-*.tar.gz",
+    "target/*/release/Burton-*.dmg",
+    "target/Burton-*.exe",
+)
+copied = []
+for base in (worktree, root):
+    for pattern in patterns:
+        for path in base.glob(pattern):
+            if not path.is_file():
+                continue
+            target = dest / path.name
+            if path.resolve() == target.resolve():
+                copied.append(target)
+                continue
+            shutil.copy2(path, target)
+            copied.append(target)
+
+unique = []
+seen = set()
+for path in copied:
+    if path in seen:
+        continue
+    seen.add(path)
+    unique.append(path)
+    print(f"Artifact: {path}")
+if not unique:
+    print(f"No installer artifacts found to copy into {dest}", file=sys.stderr)
+PY
+}
 
 if [[ ! -f "$ROOT/burton/assets/app-icon.png" ]]; then
   python3 "$ROOT/burton/script/generate-assets"
@@ -36,19 +158,38 @@ cleanup() {
 trap cleanup EXIT
 
 git worktree add --detach "$WORKTREE" HEAD
-python3 "$ROOT/burton/script/apply" --in-place --root "$WORKTREE"
 
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+APPLY_ARGS=(--in-place --root "$WORKTREE")
+if [[ -n "$CHANNEL" ]]; then
+  APPLY_ARGS+=(--channel "$CHANNEL")
+  export ZED_RELEASE_CHANNEL="$CHANNEL"
+  export RELEASE_CHANNEL="$CHANNEL"
+fi
+python3 "$ROOT/burton/script/apply" "${APPLY_ARGS[@]}"
 
 case "$MODE" in
   scan)
-    python3 "$ROOT/burton/script/scan-zed-strings" --root "$WORKTREE" "${PASS_THROUGH[@]}"
+    python3 "$ROOT/burton/script/scan-zed-strings" --root "$WORKTREE" ${PASS_THROUGH[@]+"${PASS_THROUGH[@]}"}
     ;;
   bundle-linux)
-    (cd "$WORKTREE" && script/bundle-linux "${PASS_THROUGH[@]}")
+    export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+    (cd "$WORKTREE" && script/bundle-linux ${PASS_THROUGH[@]+"${PASS_THROUGH[@]}"})
+    copy_artifacts
+    ;;
+  bundle-mac)
+    # bundle-mac copies from the worktree-relative target/ directory.
+    unset CARGO_TARGET_DIR || true
+    (cd "$WORKTREE" && script/bundle-mac ${PASS_THROUGH[@]+"${PASS_THROUGH[@]}"})
+    copy_artifacts
+    ;;
+  bundle-windows)
+    unset CARGO_TARGET_DIR || true
+    (cd "$WORKTREE" && powershell.exe -NoProfile -ExecutionPolicy Bypass -File script/bundle-windows.ps1 ${PASS_THROUGH[@]+"${PASS_THROUGH[@]}"})
+    copy_artifacts
     ;;
   build)
-    (cd "$WORKTREE" && cargo build -p zed "${PASS_THROUGH[@]}")
+    export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+    (cd "$WORKTREE" && cargo build -p zed ${PASS_THROUGH[@]+"${PASS_THROUGH[@]}"})
     ;;
   *)
     echo "Unknown mode: $MODE" >&2

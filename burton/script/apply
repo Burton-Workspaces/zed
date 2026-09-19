@@ -23,8 +23,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 BURTON_DIR = SCRIPT_DIR.parent
 CHANNEL_ICON_SUFFIXES = ("", "-dev", "-preview", "-nightly")
 
+VALID_CHANNELS = ("dev", "nightly", "preview", "stable")
+
 SETTINGS_KEY_REPLACEMENTS = (
-    ('"auto_update": true', '"auto_update": false'),
     ('"disable_ai": false', '"disable_ai": true'),
     (
         '// Send debug info like crash reports.\n    "diagnostics": true,',
@@ -395,6 +396,180 @@ def apply_branding_choke_points(root: Path, branding: dict, errors: list[str]) -
             f'tar -czvf "${{target_dir}}/release/$archive" -C ${{temp_dir}} "{bin_name}$suffix.app"',
             False,
         ),
+        (
+            "crates/auto_update/src/auto_update.rs",
+            'let app_folder_name = format!("zed{}.app", suffix);',
+            f'let app_folder_name = format!("{bin_name}{{}}.app", suffix);',
+            False,
+        ),
+        (
+            "crates/auto_update/src/auto_update.rs",
+            'let expected_suffix = format!("{}/libexec/zed-editor", app_folder_name);',
+            f'let expected_suffix = format!("{{}}/libexec/{bin_name}-editor", app_folder_name);',
+            False,
+        ),
+        (
+            "crates/auto_update/src/auto_update.rs",
+            'let mount_path = temp_dir.path().join("Zed");',
+            f'let mount_path = temp_dir.path().join("{app_name}");',
+            False,
+        ),
+        (
+            "script/bundle-mac",
+            "strip -x \"target/${target_triple}/${target_dir}/zed\"",
+            f'strip -x "target/${{target_triple}}/${{target_dir}}/{bin_name}"',
+            False,
+        ),
+        (
+            "script/bundle-mac",
+            'cp target/${target_triple}/${target_dir}/zed "${app_path}/Contents/MacOS/zed"',
+            f'cp target/${{target_triple}}/${{target_dir}}/{bin_name} "${{app_path}}/Contents/MacOS/{bin_name}"',
+            False,
+        ),
+        (
+            "script/bundle-mac",
+            '"${app_path}/Contents/MacOS/zed"',
+            f'"${{app_path}}/Contents/MacOS/{bin_name}"',
+            True,
+        ),
+        (
+            "script/bundle-mac",
+            'dmg_file_path="${dmg_target_directory}/Zed-${arch_suffix}.dmg"',
+            f'dmg_file_path="${{dmg_target_directory}}/{app_name}-${{arch_suffix}}.dmg"',
+            False,
+        ),
+        (
+            "script/bundle-mac",
+            "hdiutil create -volname Zed -srcfolder",
+            f"hdiutil create -volname {app_name} -srcfolder",
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            r'Copy-Item -Path ".\$CargoOutDir\zed.exe" -Destination "$innoDir\Zed.exe" -Force',
+            f'Copy-Item -Path ".\\$CargoOutDir\\{bin_name}.exe" -Destination "$innoDir\\{app_name}.exe" -Force',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            r'".\$CargoOutDir\zed.pdb"',
+            f'".\\$CargoOutDir\\{bin_name}.pdb"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            r'Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\zed.exe" -Force',
+            f'Move-Item -Path "$innoDir\\cli.exe" -Destination "$innoDir\\bin\\{bin_name}.exe" -Force',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            r'Move-Item -Path "$innoDir\zed.sh" -Destination "$innoDir\bin\zed" -Force',
+            f'Move-Item -Path "$innoDir\\zed.sh" -Destination "$innoDir\\bin\\{bin_name}" -Force',
+            False,
+        ),
+        (
+            "crates/zed/resources/windows/zed.sh",
+            '"$ZED_PATH/zed.exe"',
+            f'"$ZED_PATH/{bin_name}.exe"',
+            True,
+        ),
+        (
+            "crates/zed/resources/windows/zed.iss",
+            "AppPublisher=Zed Industries",
+            f"AppPublisher={app_name}",
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appName = "Zed"',
+            f'$appName = "{app_name}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appDisplayName = "Zed"',
+            f'$appDisplayName = "{app_name}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appName = "Zed Preview"',
+            f'$appName = "{names["preview"]}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appDisplayName = "Zed Preview"',
+            f'$appDisplayName = "{names["preview"]}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appName = "Zed Nightly"',
+            f'$appName = "{names["nightly"]}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appDisplayName = "Zed Nightly"',
+            f'$appDisplayName = "{names["nightly"]}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appName = "Zed Dev"',
+            f'$appName = "{names["dev"]}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appDisplayName = "Zed Dev"',
+            f'$appDisplayName = "{names["dev"]}"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appSetupName = "Zed-$Architecture"',
+            f'$appSetupName = "{app_name}-$Architecture"',
+            True,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$appExeName = "Zed"',
+            f'$appExeName = "{app_name}"',
+            True,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$regValueName = "ZedPreview"',
+            f'$regValueName = "{app_name}Preview"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$regValueName = "ZedNightly"',
+            f'$regValueName = "{app_name}Nightly"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$regValueName = "ZedDev"',
+            f'$regValueName = "{app_name}Dev"',
+            False,
+        ),
+        (
+            "script/bundle-windows.ps1",
+            '$regValueName = "Zed"',
+            f'$regValueName = "{app_name}"',
+            False,
+        ),
+        (
+            "crates/zed/resources/windows/zed.iss",
+            r'\Zed.exe',
+            rf'\{app_name}.exe',
+            True,
+        ),
     ]
 
     for relative, old, new, replace_all in replacements:
@@ -415,7 +590,15 @@ def apply_replacements_toml(root: Path, errors: list[str]) -> None:
         )
 
 
-def apply_settings_overlay(root: Path, errors: list[str]) -> None:
+def write_release_channel(root: Path, channel: str, errors: list[str]) -> None:
+    path = root / "crates" / "zed" / "RELEASE_CHANNEL"
+    if not path.is_file():
+        errors.append(f"missing {path}")
+        return
+    path.write_text(channel + "\n")
+
+
+def apply_settings_overlay(root: Path, branding: dict, errors: list[str]) -> None:
     overlay_path = BURTON_DIR / "settings-overlay.json"
     overlay_path.read_text()  # ensure it exists for reviewers
     settings = root / "assets" / "settings" / "default.json"
@@ -425,19 +608,28 @@ def apply_settings_overlay(root: Path, errors: list[str]) -> None:
             errors.append(f"missing settings key in {settings}: {old}")
             continue
         text = text.replace(old, new, 1)
+    server_url = str(branding.get("update_server_url", "")).rstrip("/")
+    if server_url:
+        old = '"server_url": "https://zed.dev"'
+        if old not in text:
+            errors.append(f"missing settings key in {settings}: {old}")
+        else:
+            text = text.replace(old, f'"server_url": "{server_url}"', 1)
     settings.write_text(text)
     # Keep the overlay file as the documented intent.
     json.loads(overlay_path.read_text())
 
 
-def apply(root: Path) -> None:
+def apply(root: Path, channel: str | None = None) -> None:
     branding = load_toml(BURTON_DIR / "branding.toml")
     errors: list[str] = []
     copy_overlays(root)
     copy_assets(root)
     apply_branding_choke_points(root, branding, errors)
     apply_replacements_toml(root, errors)
-    apply_settings_overlay(root, errors)
+    apply_settings_overlay(root, branding, errors)
+    if channel is not None:
+        write_release_channel(root, channel, errors)
 
     fatal = [item for item in errors if not item.startswith("warning:")]
     warnings = [item for item in errors if item.startswith("warning:")]
@@ -459,6 +651,11 @@ def main() -> int:
         action="store_true",
         help="Allow modifying the primary git checkout (not recommended)",
     )
+    parser.add_argument(
+        "--channel",
+        choices=VALID_CHANNELS,
+        help="Write crates/zed/RELEASE_CHANNEL (bundle builds default to stable)",
+    )
     args = parser.parse_args()
     root = args.root.resolve()
 
@@ -477,7 +674,7 @@ def main() -> int:
         return 2
 
     try:
-        apply(root)
+        apply(root, channel=args.channel)
     except ApplyError as error:
         print(error, file=sys.stderr)
         return 1

@@ -1,48 +1,175 @@
-# Burton branding overlay
+# Burton
 
-This directory is the only place Burton customizations live. Upstream Zed files on `main` stay untouched so `git merge upstream/main` does not conflict with icons, names, or copy.
+Burton is a branded desktop editor built from [Zed](https://zed.dev). This folder is the **only** place Burton customizations live. Upstream Zed sources on `main` stay untouched so you can keep merging Zed updates without fighting icon, name, or copy conflicts.
+
+You do not edit Zed files by hand. `burton/script/build` copies this repo into a throwaway worktree, applies the overlay, then compiles.
 
 ```
-upstream/main  ->  origin/main (clean Zed tree + this folder)
-                      |
-                      +--> burton/script/build  (worktree + apply + cargo)
+Zed sources (untouched)  +  burton/ overlay  →  branded Burton binary
 ```
 
-## What it changes
+This overlay is a GPL-3.0-or-later modification of Zed. Ship the license with binaries.
 
-- Product name: **Burton** (dock, About, Welcome, CLI, data dirs)
-- URL scheme: `burton://`
-- Binary / CLI: `burton`
-- App ID: `dev.burton.Burton` (and channel suffixes)
-- Icons: `burton/assets/app-icon.png` and `zed_logo.svg` copied over Zed’s filenames at apply time
-- Leftover “Zed Industries” chrome is blanked
-- Defaults: auto-update off, telemetry off, AI off, title-bar user/sign-in chrome hidden
+## What you get
 
-## Build
+Compared with a stock Zed build, Burton currently:
+
+| Area | Burton |
+|------|--------|
+| Product name | **Burton** (dock, About, Welcome, menus, CLI, data dirs) |
+| Command / binary | `burton` |
+| URL scheme | `burton://` |
+| App ID | `dev.burton.Burton` (plus `-Dev`, `-Preview`, `-Nightly`) |
+| Dock / app icon | Mountain and lake mark in `burton/assets/` |
+| In-app logo | `burton/assets/zed_logo.svg` (filename is kept on purpose) |
+| Linux `.desktop` | Name, icon, and `burton` scheme |
+| macOS bundle | `Burton.app`, DMG named `Burton-<arch>.dmg`, volume name `Burton` |
+| Windows installer | `Burton.exe`, Inno setup named `Burton-<arch>.exe` |
+| Auto-update | On, talking to Burton’s server (not zed.dev) |
+| AI | Off |
+| Telemetry | Off (diagnostics and metrics) |
+| Account chrome | Sign-in, user menu, and user picture hidden |
+| Leftover “Zed” copy | Product name swapped to Burton; other visible “Zed” chrome blanked or generic |
+
+Identity values live in `branding.toml`. Default settings live in `settings-overlay.json`. Visible string swaps live in `replacements.toml`.
+
+## Prerequisites
+
+- Git, Python 3.11+, and a Rust toolchain that can build Zed
+- Run **Linux** bundles on Linux, **macOS** bundles on a Mac, **Windows** bundles on Windows
+- macOS: Xcode command-line tools; `cargo-bundle` is installed by the bundle script if needed
+- Windows: Visual Studio 2022, Inno Setup 6, and PowerShell
+
+Icons are already generated. To recreate them:
 
 ```bash
-burton/script/generate-assets    # once, if icons are missing
-burton/script/build              # cargo build -p zed in a worktree
-burton/script/build --release
-burton/script/build -- bundle-linux
-burton/script/build -- scan      # leftover "Zed" report after apply
+burton/script/generate-assets
 ```
 
-`apply` will refuse to modify the primary checkout. Do not pass `--force` on `main`.
+## How to build
 
-The GUI binary is `target/debug/burton` (or `target/release/burton`). Official Zed’s `target/debug/zed` is unchanged because branding never hits this tree.
+Always use `burton/script/build`. It refuses to brand the checkout you are sitting in, so `main` stays a clean Zed tree.
 
-## Replace the placeholder logo
+### Day-to-day (run from source)
 
-Drop your art here, keeping these names:
+```bash
+burton/script/build              # debug GUI → target/debug/burton
+burton/script/build --release    # release GUI → target/release/burton
+```
 
-- `burton/assets/app-icon.png` — 512×512 dock icon
-- `burton/assets/app-icon@2x.png` — 1024×1024
-- `burton/assets/zed_logo.svg` — in-app Welcome / onboarding mark (filename is kept on purpose)
+This is a cargo build with Burton branding applied. It does **not** produce an installer. Debug / `dev` channel builds do not auto-update.
 
-Windows `.ico` files are generated from the PNG at apply time.
+### Production installers (one command per OS)
 
-## Upstream updates
+Bundle modes set the release channel to `stable` so the app will poll for updates.
+
+```bash
+burton/script/build bundle-linux      # on Linux
+burton/script/build bundle-mac        # on macOS
+burton/script/build bundle-windows    # on Windows
+```
+
+Optional channel:
+
+```bash
+burton/script/build --channel preview bundle-linux
+```
+
+Valid channels: `stable` (default for bundles), `preview`, `nightly`, `dev`.
+
+Installers are copied to `target/`:
+
+| OS | File | What it contains |
+|----|------|------------------|
+| Linux | `target/burton-linux-<arch>.tar.gz` | `burton.app` with `libexec/burton-editor` |
+| macOS | `target/Burton-<arch>.dmg` | `Burton.app` on a volume named `Burton` |
+| Windows | `target/Burton-<arch>.exe` | Inno installer that writes `Burton.exe` |
+
+`<arch>` is `x86_64` or `aarch64`.
+
+macOS and Windows bundlers read `target/` inside the worktree (not a shared `CARGO_TARGET_DIR`). Linux bundles share `target/` at the repo root. Either way, the files above are the ones to ship.
+
+### Check leftover “Zed” strings
+
+```bash
+burton/script/build -- scan
+```
+
+This applies branding, then reports remaining user-visible “Zed” copy in scanned paths. It should print that none were found.
+
+### Do not brand `main` in place
+
+`burton/script/apply` will refuse to modify the primary git checkout. Do not pass `--force` on `main`. That flag exists only for emergency debugging.
+
+## Auto-updates
+
+Stable (and preview / nightly) Burton builds check for updates against the host in `branding.toml`:
+
+```toml
+update_server_url = "https://updates.burton.dev"
+```
+
+Change that URL to your real server **before you ship**. It is compiled into the binary via default settings (`server_url`). At runtime you can override it without rebuilding:
+
+```bash
+ZED_SERVER_URL=http://127.0.0.1:4180 ./target/release/burton
+```
+
+Dev-channel builds never poll. `ZED_UPDATE_EXPLANATION` disables polling even on stable.
+
+### What your server must implement
+
+The app uses Zed’s release API. The query still says `asset=zed` — that is the protocol name, not the product name.
+
+```
+GET {update_server_url}/releases/{channel}/latest/asset?asset=zed&os={linux|macos|windows}&arch={x86_64|aarch64}
+```
+
+Respond with JSON:
+
+```json
+{
+  "version": "1.22.1",
+  "url": "https://updates.burton.dev/files/burton-linux-x86_64.tar.gz"
+}
+```
+
+- `version` must be a newer semver than the running app, or nothing is installed
+- `url` must point at the matching installer from the table above
+- Linux tarball top-level folder must be `burton.app` (or `burton-preview.app` / `burton-nightly.app`) with `libexec/burton-editor`
+- macOS DMG volume name must be `Burton`
+- Windows installer must write `Burton.exe`
+
+### Local update server
+
+After you have an installer in `target/`:
+
+```bash
+burton/script/serve-updates --dir target --version 1.22.1
+```
+
+That serves the JSON contract on `http://127.0.0.1:4180`. Point a stable build at it with `ZED_SERVER_URL` as shown above.
+
+## Changing the brand
+
+Edit files in `burton/` only, then rebuild.
+
+| Want to change | Edit |
+|----------------|------|
+| App name, binary name, URL scheme, app ID | `branding.toml` |
+| Update server host | `branding.toml` → `update_server_url` |
+| Dock icon | Replace `assets/app-icon.png` (512×512) and `assets/app-icon@2x.png` (1024×1024) |
+| Welcome / onboarding mark | Replace `assets/zed_logo.svg` (keep that filename) |
+| Default settings (AI, telemetry, auto-update, title bar) | `settings-overlay.json` **and** the matching keys in `script/apply` |
+| Visible “Zed” sentences | Add an exact `from` / `to` in `replacements.toml` |
+
+Windows `.ico` files are generated from the PNG at apply time. You do not check them in.
+
+Do **not** globally search-and-replace `"Zed"` in Zed sources. That breaks crate names, protocols, and tests. Prefer a unique `from` string in `replacements.toml`.
+
+## Taking Zed updates
+
+This repo tracks Zed and adds only `burton/`. Typical flow:
 
 ```bash
 git fetch upstream
@@ -51,19 +178,21 @@ burton/script/build -- scan
 burton/script/build
 ```
 
-If apply prints `missing in …`, upstream changed a branded string. Update `burton/replacements.toml` or the choke-point list in `burton/script/apply`. Add new user-visible “Zed” copy to `replacements.toml` rather than editing Zed sources.
+If apply prints `missing in …`, Zed changed a string this overlay used to rewrite. Update `replacements.toml` or the choke-point list in `script/apply`. Add new user-visible “Zed” copy to `replacements.toml` rather than editing Zed sources.
 
-## Layout
+## What’s in this folder
 
 | Path | Role |
 |------|------|
-| `branding.toml` | Name, bin, scheme, app IDs |
-| `assets/` | Icons and in-app logo |
-| `overlays/` | Full-file copies (currently `.desktop`) |
+| `branding.toml` | Name, binary, scheme, app IDs, update server |
+| `assets/` | Dock icons and in-app logo |
+| `overlays/` | Full-file copies (Linux `.desktop` template) |
 | `replacements.toml` | Allowlisted UI string edits |
 | `settings-overlay.json` | Documented default-settings intent |
 | `script/apply` | Copies overlays/assets and applies replacements |
-| `script/build` | Disposable worktree + apply + cargo |
+| `script/build` | Throwaway worktree + apply + cargo or OS bundle |
+| `script/generate-assets` | Regenerates the mountain-and-lake PNG icons |
+| `script/serve-updates` | Local Zed-compatible update server |
 | `script/scan-zed-strings` | Leftover-string report |
 
-This overlay is a GPL modification of Zed; ship it with binaries.
+The root of this git repo remains a Zed tree. After a Burton build, `target/debug/zed` from an unbranded checkout is unchanged; the branded GUI is `target/debug/burton`.

@@ -27,6 +27,8 @@ SCAN_ROOTS = (
     "assets/settings/default.json",
     "crates/zed/resources",
     "script/bundle-linux",
+    "script/bundle-mac",
+    "script/bundle-windows.ps1",
 )
 
 # Protocol values and crate identifiers that are not product chrome.
@@ -69,6 +71,11 @@ ALLOW_PATTERNS = (
     re.compile(r"Error: Zed update failed"),
     re.compile(r"Failed to (update|launch) Zed"),
     re.compile(r"macos\" => anyhow::Ok\(\"Zed"),
+    re.compile(r'IDENTITY="Zed Industries'),
+    re.compile(r"Zed-\w+-Instance-Mutex"),
+    re.compile(r"ZedIndustries\."),
+    re.compile(r"Installing Zed"),
+    re.compile(r"Building Zed and its friends"),
 )
 
 QUOTED_ZED = re.compile(r'(["\'])([^"\']*\bZed\b[^"\']*)\1')

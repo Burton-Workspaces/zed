@@ -8,3 +8,7 @@ app_id_prefix = "dev.burton"
 
 # Windows VERSIONINFO / Flatpak developer. Empty hides "Zed Industries".
 company_name = ""
+
+# Auto-update host. Must implement Zed's release API (see burton/README.md).
+# Override at runtime with ZED_SERVER_URL for local testing.
+update_server_url = "https://updates.burton.dev"
