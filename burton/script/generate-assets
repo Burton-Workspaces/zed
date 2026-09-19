@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Create Burton dock icons (PNG) from the in-app SVG geometry."""
+
+from __future__ import annotations
+
+import struct
+import zlib
+from pathlib import Path
+
+ASSETS = Path(__file__).resolve().parent.parent / "assets"
+BG = (28, 28, 30, 255)
+FG = (245, 245, 247, 255)
+
+
+def write_png(path: Path, width: int, height: int, pixels: bytearray) -> None:
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + tag
+            + data
+            + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+        )
+
+    raw = bytearray()
+    stride = width * 4
+    for y in range(height):
+        raw.append(0)
+        raw.extend(pixels[y * stride : (y + 1) * stride])
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def rounded_rect_coverage(px: float, py: float, x0: float, y0: float, x1: float, y1: float, radius: float) -> float:
+    if px < x0 or px >= x1 or py < y0 or py >= y1:
+        return 0.0
+    cx = min(max(px, x0 + radius), x1 - radius)
+    cy = min(max(py, y0 + radius), y1 - radius)
+    if abs(px - cx) <= 0.5 and abs(py - cy) <= 0.5:
+        return 1.0
+    dx = px + 0.5 - cx
+    dy = py + 0.5 - cy
+    dist = (dx * dx + dy * dy) ** 0.5
+    if dist <= radius - 0.6:
+        return 1.0
+    if dist >= radius + 0.6:
+        # still inside the straight body?
+        if x0 + radius <= px + 0.5 <= x1 - radius or y0 + radius <= py + 0.5 <= y1 - radius:
+            return 1.0
+        return 0.0
+    return max(0.0, min(1.0, radius + 0.6 - dist))
+
+
+def blend(dst: bytearray, index: int, color: tuple[int, int, int, int], alpha: float) -> None:
+    if alpha <= 0:
+        return
+    ia = int(alpha * color[3])
+    if ia <= 0:
+        return
+    inv = 255 - ia
+    dst[index] = (dst[index] * inv + color[0] * ia) // 255
+    dst[index + 1] = (dst[index + 1] * inv + color[1] * ia) // 255
+    dst[index + 2] = (dst[index + 2] * inv + color[2] * ia) // 255
+    dst[index + 3] = 255
+
+
+def fill_rounded_rect(
+    pixels: bytearray,
+    size: int,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    radius: float,
+    color: tuple[int, int, int, int],
+) -> None:
+    xmin = max(0, int(x0) - 1)
+    xmax = min(size, int(x1) + 2)
+    ymin = max(0, int(y0) - 1)
+    ymax = min(size, int(y1) + 2)
+    for y in range(ymin, ymax):
+        for x in range(xmin, xmax):
+            coverage = rounded_rect_coverage(x, y, x0, y0, x1, y1, radius)
+            if coverage:
+                blend(pixels, (y * size + x) * 4, color, coverage)
+
+
+def render_icon(size: int) -> bytearray:
+    pixels = bytearray(size * size * 4)
+    # transparent outside the squircle
+    margin = size * 0.06
+    radius = size * 0.22
+    fill_rounded_rect(pixels, size, margin, margin, size - margin, size - margin, radius, BG)
+
+    # Geometric B: vertical stem + two bowls.
+    stem_x0 = size * 0.28
+    stem_x1 = size * 0.40
+    top = size * 0.24
+    bottom = size * 0.76
+    mid = size * 0.49
+    bowl_r = size * 0.045
+    fill_rounded_rect(pixels, size, stem_x0, top, stem_x1, bottom, bowl_r, FG)
+    fill_rounded_rect(pixels, size, stem_x0, top, size * 0.70, mid, size * 0.10, FG)
+    fill_rounded_rect(pixels, size, stem_x0 + size * 0.08, top + size * 0.07, size * 0.60, mid - size * 0.06, size * 0.06, BG)
+    fill_rounded_rect(pixels, size, stem_x0, mid - size * 0.04, size * 0.72, bottom, size * 0.11, FG)
+    fill_rounded_rect(
+        pixels,
+        size,
+        stem_x0 + size * 0.08,
+        mid + size * 0.05,
+        size * 0.62,
+        bottom - size * 0.07,
+        size * 0.06,
+        BG,
+    )
+    return pixels
+
+
+def main() -> None:
+    ASSETS.mkdir(parents=True, exist_ok=True)
+    write_png(ASSETS / "app-icon.png", 512, 512, render_icon(512))
+    write_png(ASSETS / "app-icon@2x.png", 1024, 1024, render_icon(1024))
+    print(f"wrote {ASSETS / 'app-icon.png'} and {ASSETS / 'app-icon@2x.png'}")
+
+
+if __name__ == "__main__":
+    main()

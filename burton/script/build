@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Apply Burton branding in a disposable git worktree, then build.
+#
+# Usage:
+#   burton/script/build                 # cargo build -p zed
+#   burton/script/build --release
+#   burton/script/build -- bundle-linux
+#   burton/script/build -- scan
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+MODE="build"
+PASS_THROUGH=()
+if [[ "${1:-}" == "--" ]]; then
+  shift
+  if [[ "${1:-}" == "bundle-linux" ]]; then
+    MODE="bundle-linux"
+    shift
+  elif [[ "${1:-}" == "scan" ]]; then
+    MODE="scan"
+    shift
+  fi
+fi
+PASS_THROUGH+=("$@")
+
+if [[ ! -f "$ROOT/burton/assets/app-icon.png" ]]; then
+  python3 "$ROOT/burton/script/generate-assets"
+fi
+
+WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/burton-build.XXXXXX")"
+cleanup() {
+  git -C "$ROOT" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || rm -rf "$WORKTREE"
+}
+trap cleanup EXIT
+
+git worktree add --detach "$WORKTREE" HEAD
+python3 "$ROOT/burton/script/apply" --in-place --root "$WORKTREE"
+
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+
+case "$MODE" in
+  scan)
+    python3 "$ROOT/burton/script/scan-zed-strings" --root "$WORKTREE" "${PASS_THROUGH[@]}"
+    ;;
+  bundle-linux)
+    (cd "$WORKTREE" && script/bundle-linux "${PASS_THROUGH[@]}")
+    ;;
+  build)
+    (cd "$WORKTREE" && cargo build -p zed "${PASS_THROUGH[@]}")
+    ;;
+  *)
+    echo "Unknown mode: $MODE" >&2
+    exit 2
+    ;;
+esac

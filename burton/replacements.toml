@@ -1,0 +1,447 @@
+# Allowlisted exact-string replacements applied to a disposable worktree.
+# Prefer longer, unique `from` values. Do not globally replace "Zed".
+
+# --- Product identity (rename to Burton) ---
+
+[[replace]]
+file = "crates/zed/src/zed/app_menus.rs"
+from = "name: \"Zed\".into(),"
+to = "name: \"Burton\".into(),"
+
+[[replace]]
+file = "crates/zed/src/zed/app_menus.rs"
+from = "MenuItem::action(\"About Zed\", zed_actions::About),"
+to = "MenuItem::action(\"About Burton\", zed_actions::About),"
+
+[[replace]]
+file = "crates/zed/src/zed/app_menus.rs"
+from = "MenuItem::action(\"Hide Zed\", super::Hide),"
+to = "MenuItem::action(\"Hide Burton\", super::Hide),"
+
+[[replace]]
+file = "crates/zed/src/zed/app_menus.rs"
+from = "MenuItem::action(\"Quit Zed\", Quit),"
+to = "MenuItem::action(\"Quit Burton\", Quit),"
+
+[[replace]]
+file = "crates/zed/src/zed.rs"
+from = "title: Some(\"About Zed\".into()),"
+to = "title: Some(\"About Burton\".into()),"
+
+[[replace]]
+file = "crates/workspace/src/welcome.rs"
+from = "\"Welcome back to Zed\""
+to = "\"Welcome back to Burton\""
+
+[[replace]]
+file = "crates/workspace/src/welcome.rs"
+from = "\"Welcome to Zed\""
+to = "\"Welcome to Burton\""
+
+[[replace]]
+file = "crates/onboarding/src/onboarding.rs"
+from = "Headline::new(\"Welcome to Zed\")"
+to = "Headline::new(\"Welcome to Burton\")"
+
+[[replace]]
+file = "crates/ui/src/components/label/label.rs"
+from = "Label::new(\"Welcome to Zed\")"
+to = "Label::new(\"Welcome to Burton\")"
+
+[[replace]]
+file = "crates/onboarding/src/basics_page.rs"
+from = "ToggleButtonWithIcon::new(\"Zed\", IconName::AiZed, |_, _, cx| {"
+to = "ToggleButtonWithIcon::new(\"Burton\", IconName::AiZed, |_, _, cx| {"
+
+[[replace]]
+file = "crates/title_bar/src/application_menu.rs"
+from = "Menu::new(\"Zed\").items([MenuItem::action("
+to = "Menu::new(\"Burton\").items([MenuItem::action("
+
+[[replace]]
+file = "crates/title_bar/src/application_menu.rs"
+from = "menu_entry(&app_menu.entries, \"Zed\").handle.clone()"
+to = "menu_entry(&app_menu.entries, \"Burton\").handle.clone()"
+
+[[replace]]
+file = "crates/zed/src/main.rs"
+from = "#[command(name = \"zed\", disable_version_flag = true, max_term_width = 100)]"
+to = "#[command(name = \"burton\", disable_version_flag = true, max_term_width = 100)]"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "[\"zed://\", \"http://\", \"https://\", \"file://\", \"ssh://\"]"
+to = "[\"burton://\", \"http://\", \"https://\", \"file://\", \"ssh://\"]"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "name = \"zed\","
+to = "name = \"burton\","
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "The Zed CLI binary."
+to = "The Burton CLI binary."
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "This CLI is a separate binary that invokes Zed."
+to = "This CLI is a separate binary that invokes Burton."
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "          Simply opens Zed"
+to = "          Simply opens Burton"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "          Open your project in Zed"
+to = "          Open your project in Burton"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "    `zed`"
+to = "    `burton`"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "    `zed --foreground`"
+to = "    `burton --foreground`"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "    `zed path-to-your-project`"
+to = "    `burton path-to-your-project`"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "    `zed -n path-to-file `"
+to = "    `burton -n path-to-file `"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "To read from stdin, append '-', e.g. 'ps axf | zed -'"
+to = "To read from stdin, append '-', e.g. 'ps axf | burton -'"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "/// Open in existing Zed window"
+to = "/// Open in existing Burton window"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "/// The paths to open in Zed (space-separated)."
+to = "/// The paths to open in Burton (space-separated)."
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "/// Print Zed's version and the app path."
+to = "/// Print Burton's version and the app path."
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "/// Custom path to Zed.app or the zed binary"
+to = "/// Custom path to Burton.app or the burton binary"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "/// Generate shell completions for Zed"
+to = "/// Generate shell completions for Burton"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "/// Uninstall Zed from user system"
+to = "/// Uninstall Burton from user system"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "\"Add to existing Zed window ({})\","
+to = "\"Add to existing Burton window ({}),\""
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "console::style(\"You can change this later in Zed settings\"),"
+to = "console::style(\"You can change this later in Burton settings\"),"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "\"The `--system-specs` argument is not supported in the Zed CLI, only on Zed binary.\","
+to = "\"The `--system-specs` argument is not supported in the Burton CLI, only on Burton binary.\","
+
+[[replace]]
+file = "crates/zed/src/main.rs"
+from = "let message = \"Zed failed to launch\";"
+to = "let message = \"Burton failed to launch\";"
+
+[[replace]]
+file = "crates/zed/src/main.rs"
+from = "\"Zed failed to open a window: {e:?}. See https://zed.dev/docs/linux for troubleshooting steps.\""
+to = "\"Burton failed to open a window: {e:?}. See https://zed.dev/docs/linux for troubleshooting steps.\""
+
+[[replace]]
+file = "crates/zed/src/main.rs"
+from = "Notification::new(\"Zed failed to launch\")"
+to = "Notification::new(\"Burton failed to launch\")"
+
+[[replace]]
+file = "crates/zed/src/main.rs"
+from = "println!(\"Zed System Specs (from CLI):\\n{}\", system_specs);"
+to = "println!(\"Burton System Specs (from CLI):\\n{}\", system_specs);"
+
+[[replace]]
+file = "crates/zed/src/main.rs"
+from = "\"Zed/{} ({}; {})\","
+to = "\"Burton/{} ({}; {})\","
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "\"Zed {}{}{} – {}\""
+to = "\"Burton {}{}{} – {}\""
+replace_all = true
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "\"Zed {} – {}\""
+to = "\"Burton {} – {}\""
+
+[[replace]]
+file = "assets/keymaps/default-linux.json"
+from = "[\"app_menu::OpenApplicationMenu\", \"Zed\"]"
+to = "[\"app_menu::OpenApplicationMenu\", \"Burton\"]"
+
+[[replace]]
+file = "assets/keymaps/default-windows.json"
+from = "[\"app_menu::OpenApplicationMenu\", \"Zed\"]"
+to = "[\"app_menu::OpenApplicationMenu\", \"Burton\"]"
+
+[[replace]]
+file = "crates/install_cli/src/install_cli_binary.rs"
+from = "let link_path = Path::new(\"/usr/local/bin/zed\");"
+to = "let link_path = Path::new(\"/usr/local/bin/burton\");"
+
+[[replace]]
+file = "crates/auto_update_helper/src/dialog.rs"
+from = "windows::core::w!(\"Zed\"),"
+to = "windows::core::w!(\"Burton\"),"
+
+[[replace]]
+file = "crates/open_router/src/open_router.rs"
+from = "const OPEN_ROUTER_APP_TITLE: &str = \"Zed\";"
+to = "const OPEN_ROUTER_APP_TITLE: &str = \"Burton\";"
+
+# --- Leftovers: hide Zed Industries / generic chrome ---
+
+[[replace]]
+file = "crates/windows_resources/src/windows_resources.rs"
+from = "VALUE \"CompanyName\", \"Zed Industries, Inc.\\0\""
+to = "VALUE \"CompanyName\", \"\\0\""
+
+[[replace]]
+file = "crates/zed/resources/flatpak/zed.metainfo.xml.in"
+from = "<name translate=\"no\">Zed Industries, Inc.</name>"
+to = "<name translate=\"no\"></name>"
+
+[[replace]]
+file = "crates/zed/resources/snap/snapcraft.yaml.in"
+from = "title: Zed"
+to = "title: Burton"
+
+[[replace]]
+file = "crates/zed/resources/snap/snapcraft.yaml.in"
+from = "  Zed is a modern open-source code editor, built from the ground up in Rust with"
+to = "  This is a modern open-source code editor, built from the ground up in Rust with"
+
+[[replace]]
+file = "crates/zed/src/zed/app_menus.rs"
+from = "MenuItem::action(\"Zed Repository\", feedback::OpenZedRepo),"
+to = "MenuItem::action(\"Repository\", feedback::OpenZedRepo),"
+
+[[replace]]
+file = "crates/zed/src/zed/app_menus.rs"
+from = "\"Zed Twitter\","
+to = "\"Twitter\","
+
+[[replace]]
+file = "crates/zed/src/zed.rs"
+from = "Zed uses {} for rendering and requires a compatible GPU."
+to = "This editor uses {} for rendering and requires a compatible GPU."
+
+[[replace]]
+file = "crates/zed/src/zed/move_to_applications.rs"
+from = "\"Move Zed to Applications?\","
+to = "\"Move Burton to Applications?\","
+
+[[replace]]
+file = "crates/zed/src/zed/move_to_applications.rs"
+from = "\"Zed is running from a temporary location. Move it to Applications to finish installing it.\","
+to = "\"Burton is running from a temporary location. Move it to Applications to finish installing it.\","
+
+[[replace]]
+file = "crates/zed/src/zed/move_to_applications.rs"
+from = "\"Failed to move Zed to Applications\","
+to = "\"Failed to move Burton to Applications\","
+
+[[replace]]
+file = "crates/zed/src/zed/move_to_applications.rs"
+from = ".child(Label::new(\"Installing Zed…\")),"
+to = ".child(Label::new(\"Installing Burton…\")),"
+
+[[replace]]
+file = "crates/zed/src/zed/move_to_applications.rs"
+from = ".child(Label::new(\"Moving Zed to Applications\"))"
+to = ".child(Label::new(\"Moving Burton to Applications\"))"
+
+[[replace]]
+file = "crates/zed/src/zed/move_to_applications.rs"
+from = "Label::new(\"Zed will reopen when installation is complete.\")"
+to = "Label::new(\"Burton will reopen when installation is complete.\")"
+
+[[replace]]
+file = "crates/zed/src/zed/mac_only_instance.rs"
+from = "ReleaseChannel::Dev => \"Zed Editor Dev Instance Running\","
+to = "ReleaseChannel::Dev => \"Burton Editor Dev Instance Running\","
+
+[[replace]]
+file = "crates/zed/src/zed/mac_only_instance.rs"
+from = "ReleaseChannel::Nightly => \"Zed Editor Nightly Instance Running\","
+to = "ReleaseChannel::Nightly => \"Burton Editor Nightly Instance Running\","
+
+[[replace]]
+file = "crates/zed/src/zed/mac_only_instance.rs"
+from = "ReleaseChannel::Preview => \"Zed Editor Preview Instance Running\","
+to = "ReleaseChannel::Preview => \"Burton Editor Preview Instance Running\","
+
+[[replace]]
+file = "crates/zed/src/zed/mac_only_instance.rs"
+from = "ReleaseChannel::Stable => \"Zed Editor Stable Instance Running\","
+to = "ReleaseChannel::Stable => \"Burton Editor Stable Instance Running\","
+
+[[replace]]
+file = "crates/zed/src/zed/quick_action_bar/repl_menu.rs"
+from = "SharedString::from(format!(\"Setup Zed REPL for {}\", language));"
+to = "SharedString::from(format!(\"Setup REPL for {}\", language));"
+
+[[replace]]
+file = "crates/workspace/src/notifications.rs"
+from = "MessageNotification::new(\"A new version of Zed is available for download.\", cx)"
+to = "MessageNotification::new(\"A new version of Burton is available for download.\", cx)"
+
+[[replace]]
+file = "crates/workspace/src/notifications.rs"
+from = "Some(\"Zed needs an xdg-desktop-portal implementation to open files.\".into())"
+to = "Some(\"Burton needs an xdg-desktop-portal implementation to open files.\".into())"
+
+[[replace]]
+file = "crates/workspace/src/notifications.rs"
+from = "\"An update is required to continue using Zed AI.\".into()"
+to = "\"An update is required to continue using AI.\".into()"
+
+[[replace]]
+file = "crates/workspace/src/pane_group.rs"
+from = "\"{} is viewing an unshared Zed project\","
+to = "\"{} is viewing an unshared project\","
+
+[[replace]]
+file = "crates/workspace/src/pane_group.rs"
+from = "\"{} is viewing a window outside of Zed\","
+to = "\"{} is viewing a window outside of the editor\","
+
+[[replace]]
+file = "crates/workspace/src/workspace.rs"
+from = "\"Your are running an unsupported version of Zed. \","
+to = "\"Your are running an unsupported version of Burton. \","
+
+[[replace]]
+file = "crates/onboarding/src/basics_page.rs"
+from = "Some(\"Help improve Zed by sending anonymous usage data\".into()),"
+to = "Some(\"Help improve Burton by sending anonymous usage data\".into()),"
+
+[[replace]]
+file = "crates/onboarding/src/basics_page.rs"
+from = "\"Help fix Zed by sending crash reports so we can fix critical issues fast\""
+to = "\"Help fix Burton by sending crash reports so we can fix critical issues fast\""
+
+[[replace]]
+file = "crates/onboarding/src/basics_page.rs"
+from = "let tooltip_description = \"Zed can only allow services like language servers, project settings, and MCP servers to run after you mark a new project as trusted.\";"
+to = "let tooltip_description = \"Burton can only allow services like language servers, project settings, and MCP servers to run after you mark a new project as trusted.\";"
+
+[[replace]]
+file = "crates/onboarding/src/basics_page.rs"
+from = ".name(\"Zed Agent\")"
+to = ".name(\"Agent\")"
+
+[[replace]]
+file = "crates/title_bar/src/title_bar.rs"
+from = "Some(AutoUpdateStatus::Updated { .. }) => \"Please restart Zed to Collaborate\","
+to = "Some(AutoUpdateStatus::Updated { .. }) => \"Please restart Burton to Collaborate\","
+
+[[replace]]
+file = "crates/title_bar/src/title_bar.rs"
+from = "| None => \"Please update Zed to Collaborate\","
+to = "| None => \"Please update Burton to Collaborate\","
+
+[[replace]]
+file = "crates/title_bar/src/title_bar.rs"
+from = ".child(Label::new(\"Restart to update Zed\").color(Color::Accent))"
+to = ".child(Label::new(\"Restart to update Burton\").color(Color::Accent))"
+
+[[replace]]
+file = "crates/title_bar/src/collab.rs"
+from = "Please check that you have given Zed permissions to record your screen in Settings."
+to = "Please check that you have given Burton permissions to record your screen in Settings."
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "doc = \"`~/Library/Application Support/Zed`.\""
+to = "doc = \"`~/Library/Application Support/Burton`.\""
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "doc = \"`$XDG_DATA_HOME/zed`.\""
+to = "doc = \"`$XDG_DATA_HOME/burton`.\""
+
+[[replace]]
+file = "crates/collab_ui/src/notifications/incoming_call_notification.rs"
+from = "\"{} is sharing a project in Zed\","
+to = "\"{} is sharing a project in Burton\","
+
+[[replace]]
+file = "crates/install_cli/src/install_cli_binary.rs"
+from = ".detach_and_prompt_err(\"Cannot install the Zed CLI\", window, cx, |_, _, _| None);"
+to = ".detach_and_prompt_err(\"Cannot install the Burton CLI\", window, cx, |_, _, _| None);"
+
+[[replace]]
+file = "crates/install_cli/src/install_cli_binary.rs"
+from = "If you installed Zed from our official release add ~/.local/bin to your PATH.\\n\\nIf you installed Zed from a different source like your package manager, then you may need to create an alias/symlink manually.\\n\\nDepending on your package manager, the CLI might be named zeditor, zedit, zed-editor or something else."
+to = "If you installed Burton from our official release add ~/.local/bin to your PATH.\\n\\nIf you installed Burton from a different source like your package manager, then you may need to create an alias/symlink manually.\\n\\nDepending on your package manager, the CLI might be named zeditor, zedit, zed-editor or something else."
+
+[[replace]]
+file = "crates/auto_update/src/auto_update.rs"
+from = "\"Zed was installed via a package manager.\","
+to = "\"Burton was installed via a package manager.\","
+
+[[replace]]
+file = "crates/auto_update_helper/src/dialog.rs"
+from = "let string = HSTRING::from(\"Updating Zed...\");"
+to = "let string = HSTRING::from(\"Updating Burton...\");"
+
+[[replace]]
+file = "crates/auto_update_helper/src/auto_update_helper.rs"
+from = "windows::core::w!(\"Error: Zed update failed.\"),"
+to = "windows::core::w!(\"Error: Burton update failed.\"),"
+
+[[replace]]
+file = "crates/zed/src/watcher_debug.rs"
+from = "const EXCLUSION_SCOPE: &str = \"Patterns Zed skips when scanning your open local projects. Excluded files may still produce watcher events.\";"
+to = "const EXCLUSION_SCOPE: &str = \"Patterns skipped when scanning your open local projects. Excluded files may still produce watcher events.\";"
+
+[[replace]]
+file = "crates/zed/src/reliability.rs"
+from = "\"A GPU found on the users system. May or may not be the GPU Zed is running on\","
+to = "\"A GPU found on the users system. May or may not be the GPU this editor is running on\","
+
+[[replace]]
+file = "crates/zed/src/reliability.rs"
+from = "\"The GPU Zed is running on\","
+to = "\"The GPU this editor is running on\","

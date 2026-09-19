@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Report remaining quoted \"Zed\" product-chrome strings after branding is applied."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+SCAN_ROOTS = (
+    "crates/zed/src",
+    "crates/workspace/src",
+    "crates/onboarding",
+    "crates/title_bar",
+    "crates/cli/src",
+    "crates/auto_update",
+    "crates/auto_update_ui",
+    "crates/auto_update_helper",
+    "crates/collab_ui",
+    "crates/install_cli",
+    "crates/windows_resources",
+    "crates/release_channel",
+    "crates/paths/src",
+    "crates/client/src",
+    "assets/keymaps",
+    "assets/settings/default.json",
+    "crates/zed/resources",
+    "script/bundle-linux",
+)
+
+# Protocol values and crate identifiers that are not product chrome.
+ALLOW_PATTERNS = (
+    re.compile(r"BaseKeymap::Zed"),
+    re.compile(r'"base_keymap"\s*:\s*"Zed"'),
+    re.compile(r"zed-industries"),
+    re.compile(r"zed\.dev"),
+    re.compile(r"crates/zed"),
+    re.compile(r"\bZED_[A-Z0-9_]+"),
+    re.compile(r"\.zed_server"),
+    re.compile(r"zed_actions"),
+    re.compile(r"LanguageModelProviderName::new\(\"Zed\"\)"),
+    re.compile(r"AgentId::from\(\"Zed\"\)"),
+    re.compile(r"client_name: Some\(\"Zed\""),
+    re.compile(r"github\.com/zed"),
+    re.compile(r"twitter\.com/zed"),
+    re.compile(r"include_bytes!\(\"\.\./resources/app-icon"),
+    re.compile(r'app_name:\s*"Zed"'),
+    re.compile(r'"icon_theme":\s*"Zed \(Default\)"'),
+    re.compile(r"Zed\.exe"),
+    re.compile(r"Zed\.dmg"),
+    re.compile(r"\\\\Zed"),
+    re.compile(r"join\(\"Zed\"\)"),
+    re.compile(r"p\(\"Zed"),
+    re.compile(r"Handshake (before|after) Zed spawn"),
+    re.compile(r"telemetry::event!\(\s*\"Welcome Zed"),
+    re.compile(r"Show me the Zed logo"),
+    re.compile(r"\{zed,Zed\}"),
+    re.compile(r"zed\.iss"),
+    re.compile(r"Zed-Auto-Updater"),
+    re.compile(r"C:\\Zed"),
+    re.compile(r"Program Files\\Zed"),
+    re.compile(r"C:\\Zed Data"),
+    re.compile(r"project — Zed"),
+    re.compile(r"Zed — root"),
+    re.compile(r"No parent dir for Zed"),
+    re.compile(r"failed to copy Zed update"),
+    re.compile(r"Starting Zed update"),
+    re.compile(r"Error: Zed update failed"),
+    re.compile(r"Failed to (update|launch) Zed"),
+    re.compile(r"macos\" => anyhow::Ok\(\"Zed"),
+)
+
+QUOTED_ZED = re.compile(r'(["\'])([^"\']*\bZed\b[^"\']*)\1')
+SKIP_SUFFIXES = (".png", ".ico", ".icns", ".woff", ".woff2", ".wasm")
+SKIP_LINE_PREFIXES = ("//", "/*", "*", "#")
+
+
+def allowed(line: str) -> bool:
+    return any(pattern.search(line) for pattern in ALLOW_PATTERNS)
+
+
+def is_skipped_line(stripped: str) -> bool:
+    if not stripped:
+        return True
+    if stripped.startswith("///") or stripped.startswith("//!") or stripped.startswith("#["):
+        # Clap doc comments and attributes can be user-visible.
+        return False
+    return stripped.startswith(SKIP_LINE_PREFIXES)
+
+
+def scan(root: Path) -> list[str]:
+    hits: list[str] = []
+    for relative in SCAN_ROOTS:
+        path = root / relative
+        if path.is_file():
+            files = [path]
+        elif path.is_dir():
+            files = [candidate for candidate in path.rglob("*") if candidate.is_file()]
+        else:
+            continue
+        for file_path in files:
+            if file_path.suffix.lower() in SKIP_SUFFIXES:
+                continue
+            try:
+                text = file_path.read_text()
+            except UnicodeDecodeError:
+                continue
+            for line_number, line in enumerate(text.splitlines(), 1):
+                stripped = line.strip()
+                if is_skipped_line(stripped):
+                    continue
+                if not QUOTED_ZED.search(line):
+                    continue
+                if allowed(line):
+                    continue
+                rel = file_path.relative_to(root)
+                hits.append(f"{rel}:{line_number}:{stripped}")
+    return hits
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit 1 when leftover strings remain",
+    )
+    args = parser.parse_args()
+    root = args.root.resolve()
+    hits = scan(root)
+    if not hits:
+        print("No leftover user-visible Zed strings in scanned paths.")
+        return 0
+    print(f"{len(hits)} leftover Zed string(s):")
+    for hit in hits:
+        print(hit)
+    return 1 if args.strict else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

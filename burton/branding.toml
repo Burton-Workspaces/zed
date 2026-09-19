@@ -1,0 +1,10 @@
+# Burton product identity. Applied at build time onto a disposable worktree.
+# Do not edit upstream Zed files; change values here instead.
+
+app_name = "Burton"
+bin_name = "burton"
+url_scheme = "burton"
+app_id_prefix = "dev.burton"
+
+# Windows VERSIONINFO / Flatpak developer. Empty hides "Zed Industries".
+company_name = ""

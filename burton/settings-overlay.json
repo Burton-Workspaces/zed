@@ -1,0 +1,13 @@
+{
+  "auto_update": false,
+  "disable_ai": true,
+  "telemetry": {
+    "diagnostics": false,
+    "metrics": false
+  },
+  "title_bar": {
+    "show_user_menu": false,
+    "show_sign_in": false,
+    "show_user_picture": false
+  }
+}

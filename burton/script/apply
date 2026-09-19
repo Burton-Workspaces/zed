@@ -1,0 +1,488 @@
+#!/usr/bin/env python3
+"""Apply Burton branding onto a Zed source tree.
+
+By default this refuses to modify the primary git checkout. Use a worktree
+(via burton/script/build) or pass --force.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import struct
+import sys
+from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:  # Python < 3.11
+    sys.exit("Python 3.11+ is required (tomllib).")
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+BURTON_DIR = SCRIPT_DIR.parent
+CHANNEL_ICON_SUFFIXES = ("", "-dev", "-preview", "-nightly")
+
+SETTINGS_KEY_REPLACEMENTS = (
+    ('"auto_update": true', '"auto_update": false'),
+    ('"disable_ai": false', '"disable_ai": true'),
+    (
+        '// Send debug info like crash reports.\n    "diagnostics": true,',
+        '// Send debug info like crash reports.\n    "diagnostics": false,',
+    ),
+    (
+        '// Send anonymized usage data like what languages you\'re using Zed with.\n    "metrics": true,',
+        '// Send anonymized usage data like what languages you\'re using Zed with.\n    "metrics": false,',
+    ),
+    ('"show_user_menu": true', '"show_user_menu": false'),
+    ('"show_sign_in": true', '"show_sign_in": false'),
+    ('"show_user_picture": true', '"show_user_picture": false'),
+)
+
+
+class ApplyError(Exception):
+    pass
+
+
+def load_toml(path: Path) -> dict:
+    with path.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def is_primary_checkout(root: Path) -> bool:
+    git_path = root / ".git"
+    return git_path.is_dir()
+
+
+def replace_in_file(path: Path, old: str, new: str, *, replace_all: bool, required: bool, errors: list[str]) -> None:
+    text = path.read_text()
+    count = text.count(old)
+    if count == 0:
+        if required:
+            errors.append(f"missing in {path}: {old!r}")
+        return
+    if not replace_all and count > 1:
+        # Still replace the first occurrence; warn so overlays can be tightened.
+        errors.append(f"warning: {count} matches in {path} for {old!r}; replacing first only")
+        path.write_text(text.replace(old, new, 1))
+        return
+    path.write_text(text.replace(old, new))
+
+
+def copy_overlays(root: Path) -> None:
+    overlays = BURTON_DIR / "overlays"
+    if not overlays.is_dir():
+        return
+    for source in overlays.rglob("*"):
+        if not source.is_file():
+            continue
+        dest = root / source.relative_to(overlays)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest)
+
+
+def write_ico_from_png(png_path: Path, ico_path: Path) -> None:
+    png = png_path.read_bytes()
+    count = 1
+    header = struct.pack("<HHH", 0, 1, count)
+    offset = 6 + 16 * count
+    # 0 means 256+ in the width/height bytes.
+    entry = struct.pack("<BBBBHHII", 0, 0, 0, 0, 1, 32, len(png), offset)
+    ico_path.parent.mkdir(parents=True, exist_ok=True)
+    ico_path.write_bytes(header + entry + png)
+
+
+def copy_assets(root: Path) -> None:
+    icon = BURTON_DIR / "assets" / "app-icon.png"
+    icon_2x = BURTON_DIR / "assets" / "app-icon@2x.png"
+    logo = BURTON_DIR / "assets" / "zed_logo.svg"
+    if not icon.is_file() or not icon_2x.is_file():
+        raise ApplyError(
+            "Missing Burton icons. Add burton/assets/app-icon.png and "
+            "app-icon@2x.png (or run burton/script/generate-assets)."
+        )
+    if not logo.is_file():
+        raise ApplyError("Missing burton/assets/zed_logo.svg")
+
+    resources = root / "crates" / "zed" / "resources"
+    for suffix in CHANNEL_ICON_SUFFIXES:
+        dest = resources / f"app-icon{suffix}.png"
+        dest_2x = resources / f"app-icon{suffix}@2x.png"
+        if not dest.exists() and suffix:
+            continue
+        shutil.copy2(icon, dest)
+        shutil.copy2(icon_2x, dest_2x)
+
+    windows_icons = resources / "windows"
+    write_ico_from_png(icon_2x, windows_icons / "app-icon.ico")
+    for suffix in ("-dev", "-preview", "-nightly"):
+        write_ico_from_png(icon_2x, windows_icons / f"app-icon{suffix}.ico")
+
+    shutil.copy2(logo, root / "assets" / "images" / "zed_logo.svg")
+
+
+def apply_branding_choke_points(root: Path, branding: dict, errors: list[str]) -> None:
+    app_name = branding["app_name"]
+    bin_name = branding["bin_name"]
+    scheme = branding["url_scheme"]
+    prefix = branding["app_id_prefix"]
+    company = branding.get("company_name", "")
+
+    names = {
+        "dev": f"{app_name} Dev",
+        "nightly": f"{app_name} Nightly",
+        "preview": f"{app_name} Preview",
+        "stable": app_name,
+        "devel": f"{app_name} Devel",
+    }
+    app_ids = {
+        "dev": f"{prefix}.{app_name}-Dev",
+        "nightly": f"{prefix}.{app_name}-Nightly",
+        "preview": f"{prefix}.{app_name}-Preview",
+        "stable": f"{prefix}.{app_name}",
+    }
+
+    replacements: list[tuple[str, str, str, bool]] = [
+        (
+            "crates/paths/src/paths.rs",
+            'pub const APP_NAME: &str = "Zed";',
+            f'pub const APP_NAME: &str = "{app_name}";',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Dev => "Zed Dev",',
+            f'ReleaseChannel::Dev => "{names["dev"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Nightly => "Zed Nightly",',
+            f'ReleaseChannel::Nightly => "{names["nightly"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Preview => "Zed Preview",',
+            f'ReleaseChannel::Preview => "{names["preview"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Stable => "Zed",',
+            f'ReleaseChannel::Stable => "{names["stable"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Dev => "dev.zed.Zed-Dev",',
+            f'ReleaseChannel::Dev => "{app_ids["dev"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Nightly => "dev.zed.Zed-Nightly",',
+            f'ReleaseChannel::Nightly => "{app_ids["nightly"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Preview => "dev.zed.Zed-Preview",',
+            f'ReleaseChannel::Preview => "{app_ids["preview"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Stable => "dev.zed.Zed",',
+            f'ReleaseChannel::Stable => "{app_ids["stable"]}",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Dev => "Zed-Editor-Dev",',
+            f'ReleaseChannel::Dev => "{app_name}-Editor-Dev",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Nightly => "Zed-Editor-Nightly",',
+            f'ReleaseChannel::Nightly => "{app_name}-Editor-Nightly",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Preview => "Zed-Editor-Preview",',
+            f'ReleaseChannel::Preview => "{app_name}-Editor-Preview",',
+            False,
+        ),
+        (
+            "crates/release_channel/src/lib.rs",
+            'ReleaseChannel::Stable => "Zed-Editor-Stable",',
+            f'ReleaseChannel::Stable => "{app_name}-Editor-Stable",',
+            False,
+        ),
+        (
+            "crates/zed/Cargo.toml",
+            'default-run = "zed"',
+            f'default-run = "{bin_name}"',
+            False,
+        ),
+        (
+            "crates/zed/Cargo.toml",
+            'name = "zed"\npath = "src/main.rs"',
+            f'name = "{bin_name}"\npath = "src/main.rs"',
+            False,
+        ),
+        (
+            "crates/zed/Cargo.toml",
+            'identifier = "dev.zed.Zed-Dev"\nname = "Zed Dev"',
+            f'identifier = "{app_ids["dev"]}"\nname = "{names["dev"]}"',
+            False,
+        ),
+        (
+            "crates/zed/Cargo.toml",
+            'identifier = "dev.zed.Zed-Nightly"\nname = "Zed Nightly"',
+            f'identifier = "{app_ids["nightly"]}"\nname = "{names["nightly"]}"',
+            False,
+        ),
+        (
+            "crates/zed/Cargo.toml",
+            'identifier = "dev.zed.Zed-Preview"\nname = "Zed Preview"',
+            f'identifier = "{app_ids["preview"]}"\nname = "{names["preview"]}"',
+            False,
+        ),
+        (
+            "crates/zed/Cargo.toml",
+            'identifier = "dev.zed.Zed"\nname = "Zed"',
+            f'identifier = "{app_ids["stable"]}"\nname = "{names["stable"]}"',
+            False,
+        ),
+        (
+            "crates/zed/Cargo.toml",
+            'osx_url_schemes = ["zed"]',
+            f'osx_url_schemes = ["{scheme}"]',
+            True,
+        ),
+        (
+            "crates/client/src/client.rs",
+            'pub const ZED_URL_SCHEME: &str = "zed";',
+            f'pub const ZED_URL_SCHEME: &str = "{scheme}";',
+            False,
+        ),
+        (
+            "crates/cli/src/main.rs",
+            'starts_with("dev.zed.Zed")',
+            f'starts_with("{prefix}.{app_name}")',
+            True,
+        ),
+        (
+            "crates/windows_resources/src/windows_resources.rs",
+            '("app-icon.ico", "Zed"),',
+            f'("app-icon.ico", "{names["stable"]}"),',
+            False,
+        ),
+        (
+            "crates/windows_resources/src/windows_resources.rs",
+            '("app-icon-preview.ico", "Zed Preview"),',
+            f'("app-icon-preview.ico", "{names["preview"]}"),',
+            False,
+        ),
+        (
+            "crates/windows_resources/src/windows_resources.rs",
+            '("app-icon-nightly.ico", "Zed Nightly"),',
+            f'("app-icon-nightly.ico", "{names["nightly"]}"),',
+            False,
+        ),
+        (
+            "crates/windows_resources/src/windows_resources.rs",
+            '("app-icon-dev.ico", "Zed Dev"),',
+            f'("app-icon-dev.ico", "{names["dev"]}"),',
+            False,
+        ),
+        (
+            "crates/windows_resources/src/windows_resources.rs",
+            'VALUE "LegalCopyright", "Copyright 2022 - 2025 Zed Industries, Inc.\\0"',
+            f'VALUE "LegalCopyright", "{company}\\0"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'export APP_CLI="zed"',
+            f'export APP_CLI="{bin_name}"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'export APP_ICON="zed"',
+            f'export APP_ICON="{bin_name}"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'export APP_NAME="Zed Preview"\n  APP_ID="dev.zed.Zed-Preview"',
+            f'export APP_NAME="{names["preview"]}"\n  APP_ID="{app_ids["preview"]}"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'export APP_NAME="Zed Nightly"\n  APP_ID="dev.zed.Zed-Nightly"',
+            f'export APP_NAME="{names["nightly"]}"\n  APP_ID="{app_ids["nightly"]}"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'export APP_NAME="Zed Devel"\n  APP_ID="dev.zed.Zed-Dev"',
+            f'export APP_NAME="{names["devel"]}"\n  APP_ID="{app_ids["dev"]}"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'export APP_NAME="Zed"\n  APP_ID="dev.zed.Zed"',
+            f'export APP_NAME="{names["stable"]}"\n  APP_ID="{app_ids["stable"]}"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            "apps/zed.png",
+            f"apps/{bin_name}.png",
+            True,
+        ),
+        (
+            "script/bundle-linux",
+            'cp "${target_dir}/${target_triple}/release/cli" "${zed_dir}/bin/zed"',
+            f'cp "${{target_dir}}/${{target_triple}}/release/cli" "${{zed_dir}}/bin/{bin_name}"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'cp "${target_dir}/${target_triple}/release/zed" "${zed_dir}/libexec/zed-editor"',
+            f'cp "${{target_dir}}/${{target_triple}}/release/{bin_name}" "${{zed_dir}}/libexec/{bin_name}-editor"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            '"${target_dir}/${target_triple}/release/zed"',
+            f'"${{target_dir}}/${{target_triple}}/release/{bin_name}"',
+            True,
+        ),
+        (
+            "script/bundle-linux",
+            '"${target_dir}/${target_triple}"/release/zed',
+            f'"${{target_dir}}/${{target_triple}}"/release/{bin_name}',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            "ldd ${target_dir}/${target_triple}/release/zed",
+            f"ldd ${{target_dir}}/${{target_triple}}/release/{bin_name}",
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'zed_dir="${temp_dir}/zed$suffix.app"',
+            f'zed_dir="${{temp_dir}}/{bin_name}$suffix.app"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'archive="zed-linux-${arch}.tar.gz"',
+            f'archive="{bin_name}-linux-${{arch}}.tar.gz"',
+            False,
+        ),
+        (
+            "script/bundle-linux",
+            'tar -czvf "${target_dir}/release/$archive" -C ${temp_dir} "zed$suffix.app"',
+            f'tar -czvf "${{target_dir}}/release/$archive" -C ${{temp_dir}} "{bin_name}$suffix.app"',
+            False,
+        ),
+    ]
+
+    for relative, old, new, replace_all in replacements:
+        replace_in_file(root / relative, old, new, replace_all=replace_all, required=True, errors=errors)
+
+
+def apply_replacements_toml(root: Path, errors: list[str]) -> None:
+    data = load_toml(BURTON_DIR / "replacements.toml")
+    for entry in data.get("replace", []):
+        path = root / entry["file"]
+        replace_in_file(
+            path,
+            entry["from"],
+            entry["to"],
+            replace_all=bool(entry.get("replace_all", False)),
+            required=True,
+            errors=errors,
+        )
+
+
+def apply_settings_overlay(root: Path, errors: list[str]) -> None:
+    overlay_path = BURTON_DIR / "settings-overlay.json"
+    overlay_path.read_text()  # ensure it exists for reviewers
+    settings = root / "assets" / "settings" / "default.json"
+    text = settings.read_text()
+    for old, new in SETTINGS_KEY_REPLACEMENTS:
+        if old not in text:
+            errors.append(f"missing settings key in {settings}: {old}")
+            continue
+        text = text.replace(old, new, 1)
+    settings.write_text(text)
+    # Keep the overlay file as the documented intent.
+    json.loads(overlay_path.read_text())
+
+
+def apply(root: Path) -> None:
+    branding = load_toml(BURTON_DIR / "branding.toml")
+    errors: list[str] = []
+    copy_overlays(root)
+    copy_assets(root)
+    apply_branding_choke_points(root, branding, errors)
+    apply_replacements_toml(root, errors)
+    apply_settings_overlay(root, errors)
+
+    fatal = [item for item in errors if not item.startswith("warning:")]
+    warnings = [item for item in errors if item.startswith("warning:")]
+    for item in warnings:
+        print(item, file=sys.stderr)
+    if fatal:
+        for item in fatal:
+            print(item, file=sys.stderr)
+        raise ApplyError(f"{len(fatal)} branding replacement(s) failed")
+    print(f"Burton branding applied to {root}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path.cwd(), help="Zed source tree to modify")
+    parser.add_argument("--in-place", action="store_true", help="Write changes (required)")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow modifying the primary git checkout (not recommended)",
+    )
+    args = parser.parse_args()
+    root = args.root.resolve()
+
+    if not args.in_place:
+        print("Refusing to run without --in-place. Use burton/script/build.", file=sys.stderr)
+        return 2
+    if is_primary_checkout(root) and not args.force:
+        print(
+            f"{root} looks like the primary git checkout.\n"
+            "Apply branding in a disposable worktree (burton/script/build) or pass --force.",
+            file=sys.stderr,
+        )
+        return 2
+    if not (root / "crates" / "zed").is_dir():
+        print(f"{root} does not look like the Zed repository root.", file=sys.stderr)
+        return 2
+
+    try:
+        apply(root)
+    except ApplyError as error:
+        print(error, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
