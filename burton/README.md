@@ -37,8 +37,15 @@ Identity values live in `branding.toml`. Default settings live in `settings-over
 
 - Git, Python 3.11+, and a Rust toolchain that can build Zed
 - Run **Linux** bundles on Linux, **macOS** bundles on a Mac, **Windows** bundles on Windows
+- Linux: install Zed’s system libraries once with `script/linux` (needs sudo). That pulls in X11, Wayland, Vulkan, musl, and the rest of the compile toolchain. Without it, `bundle-linux` fails looking for `x11.pc` (`libx11-dev` on Debian/Ubuntu)
 - macOS: Xcode command-line tools; `cargo-bundle` is installed by the bundle script if needed
 - Windows: Visual Studio 2022, Inno Setup 6, and PowerShell
+
+On Linux, before the first build:
+
+```bash
+script/linux
+```
 
 Icons are already generated. To recreate them:
 
