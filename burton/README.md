@@ -26,6 +26,7 @@ Compared with a stock Zed build, Burton currently:
 | macOS bundle | `Burton.app`, DMG named `Burton-<arch>.dmg`, volume name `Burton` |
 | Windows installer | `Burton.exe`, Inno setup named `Burton-<arch>.exe` |
 | Auto-update | On, talking to Burton’s server (not zed.dev) |
+| Extensions | Marketplace on the same origin; `burton-update-dev` proxies Zed |
 | AI | Off |
 | Telemetry | Off (diagnostics and metrics) |
 | Account chrome | Sign-in, user menu, and user picture hidden |
@@ -108,25 +109,34 @@ This applies branding, then reports remaining user-visible “Zed” copy in sca
 
 `burton/script/apply` will refuse to modify the primary git checkout. Do not pass `--force` on `main`. That flag exists only for emergency debugging.
 
-## Auto-updates
+## Auto-updates and extensions
 
-Stable (and preview / nightly) Burton builds check for updates against the host in `branding.toml`:
+Stable (and preview / nightly) Burton builds use **one origin** for auto-updates and the extension marketplace. Both are compiled from `branding.toml`:
 
 ```toml
 update_server_url = "https://updates.burton.dev"
 ```
 
-Change that URL to your real server **before you ship**. It is compiled into the binary via default settings (`server_url`). At runtime you can override it without rebuilding:
+That value becomes `server_url`. On a custom host, the app does **not** remap to `cloud.zed.dev` / `api.zed.dev`, so this origin must implement both:
+
+| App call | Path | Served by |
+|----------|------|-----------|
+| Auto-update | `GET /releases/{channel}/{version}/asset` | Local installer files |
+| Installer download | `GET /files/{name}` | Local installer files |
+| Extensions catalog / versions / updates | `GET /extensions`, `GET /extensions/updates`, `GET /extensions/{id}` | Reverse-proxy to Zed (`https://api.zed.dev` by default) |
+| Extension install | `GET /extensions/{id}/download` | Reverse-proxy; **302s to Zed blob storage are followed server-side** so the client never sees those URLs |
+
+Change the URL to your real server **before you ship**. At runtime you can override it without rebuilding:
 
 ```bash
 ZED_SERVER_URL=http://127.0.0.1:4180 ./target/release/burton
 ```
 
-Dev-channel builds never poll. `ZED_UPDATE_EXPLANATION` disables polling even on stable.
+Dev-channel builds never poll for app updates. `ZED_UPDATE_EXPLANATION` disables polling even on stable. Extensions still use the same origin.
 
-### What your server must implement
+### What the update JSON must look like
 
-The app uses Zed’s release API. The query still says `asset=zed` — that is the protocol name, not the product name.
+The query still says `asset=zed` — that is the protocol name, not the product name.
 
 ```
 GET {update_server_url}/releases/{channel}/latest/asset?asset=zed&os={linux|macos|windows}&arch={x86_64|aarch64}
@@ -147,15 +157,45 @@ Respond with JSON:
 - macOS DMG volume name must be `Burton`
 - Windows installer must write `Burton.exe`
 
-### Local update server
+### Local server (`burton-update-dev`)
 
-After you have an installer in `target/`:
+`burton-update-dev` is a Rust CLI (not part of the Zed workspace). After you have an installer in `target/`:
 
 ```bash
 burton/script/serve-updates --dir target --version 1.22.1
 ```
 
-That serves the JSON contract on `http://127.0.0.1:4180`. Point a stable build at it with `ZED_SERVER_URL` as shown above.
+Or:
+
+```bash
+cargo run --manifest-path burton/update-dev/Cargo.toml -- --dir target --version 1.22.1
+```
+
+That binds `http://127.0.0.1:4180` by default. Point a stable build at it with `ZED_SERVER_URL` as shown above.
+
+Useful flags:
+
+| Flag | Purpose |
+|------|---------|
+| `--dir` | Search directory for installers (repeatable; default `target/`) |
+| `--version` | Version string in the release JSON (default: `crates/zed/Cargo.toml`) |
+| `--host` / `--port` | Bind address (default `127.0.0.1:4180`) |
+| `--listen` | Bind `host:port` in one flag (overrides `--host`/`--port`) |
+| `--public-url` | Origin written into release `url` (use this behind Caddy) |
+| `--extensions-upstream` | Marketplace to proxy (default `https://api.zed.dev`) |
+
+If catalog listing 404s, try `--extensions-upstream https://cloud.zed.dev`.
+
+### Caddy (TLS)
+
+Caddy only terminates TLS. The CLI owns routing so extension download redirects stay on this origin:
+
+```bash
+burton-update-dev --listen 127.0.0.1:4180 --dir target --public-url https://updates.burton.dev
+caddy run --config burton/update-dev/Caddyfile
+```
+
+`--public-url` is required when the bind address is loopback; otherwise release JSON would advertise `http://127.0.0.1:4180`. Without `--public-url`, the CLI uses `X-Forwarded-Proto` and `X-Forwarded-Host` from Caddy, then `Host`.
 
 ## Changing the brand
 
@@ -199,7 +239,9 @@ If apply prints `missing in …`, Zed changed a string this overlay used to rewr
 | `script/apply` | Copies overlays/assets and applies replacements |
 | `script/build` | Throwaway worktree + apply + cargo or OS bundle |
 | `script/generate-assets` | Regenerates the mountain-and-lake PNG icons |
-| `script/serve-updates` | Local Zed-compatible update server |
+| `script/serve-updates` | Launches `burton-update-dev` |
+| `update-dev/` | Rust CLI: local updates + Zed extensions reverse-proxy |
+| `update-dev/Caddyfile` | Example TLS terminator for `updates.burton.dev` |
 | `script/scan-zed-strings` | Leftover-string report |
 
 The root of this git repo remains a Zed tree. After a Burton build, `target/debug/zed` from an unbranded checkout is unchanged; the branded GUI is `target/debug/burton`.

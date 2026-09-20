@@ -1,0 +1,10 @@
+# TLS terminator in front of burton-update-dev.
+# The CLI owns routing (updates + extension proxy) so download redirects
+# are followed server-side and never leak Zed blob URLs to the client.
+#
+#   burton-update-dev --listen 127.0.0.1:4180 --dir target --public-url https://updates.burton.dev
+#   caddy run --config burton/update-dev/Caddyfile
+
+updates.burton.dev {
+	reverse_proxy 127.0.0.1:4180
+}
