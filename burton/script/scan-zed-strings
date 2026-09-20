@@ -35,6 +35,9 @@ SCAN_ROOTS = (
 ALLOW_PATTERNS = (
     re.compile(r"BaseKeymap::Zed"),
     re.compile(r'"base_keymap"\s*:\s*"Zed"'),
+    re.compile(r'ToggleButtonWithIcon::new\("Zed"'),
+    re.compile(r'"Zed \(Default\)"'),
+    re.compile(r'write!\(f, "Zed"\)'),
     re.compile(r"zed-industries"),
     re.compile(r"zed\.dev"),
     re.compile(r"crates/zed"),

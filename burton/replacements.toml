@@ -49,11 +49,6 @@ from = "Label::new(\"Welcome to Zed\")"
 to = "Label::new(\"Welcome to Burton\")"
 
 [[replace]]
-file = "crates/onboarding/src/basics_page.rs"
-from = "ToggleButtonWithIcon::new(\"Zed\", IconName::AiZed, |_, _, cx| {"
-to = "ToggleButtonWithIcon::new(\"Burton\", IconName::AiZed, |_, _, cx| {"
-
-[[replace]]
 file = "crates/title_bar/src/application_menu.rs"
 from = "Menu::new(\"Zed\").items([MenuItem::action("
 to = "Menu::new(\"Burton\").items([MenuItem::action("
@@ -156,12 +151,27 @@ to = "/// Uninstall Burton from user system"
 [[replace]]
 file = "crates/cli/src/main.rs"
 from = "\"Add to existing Zed window ({})\","
-to = "\"Add to existing Burton window ({}),\""
+to = "\"Add to existing Burton window ({})\","
 
 [[replace]]
 file = "crates/cli/src/main.rs"
 from = "console::style(\"You can change this later in Zed settings\"),"
 to = "console::style(\"You can change this later in Burton settings\"),"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "blue.apply_to(\"zed --existing\")"
+to = "blue.apply_to(\"burton --existing\")"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "blue.apply_to(\"zed --classic\")"
+to = "blue.apply_to(\"burton --classic\")"
+
+[[replace]]
+file = "crates/cli/src/main.rs"
+from = "blue.apply_to(\"zed <path>\")"
+to = "blue.apply_to(\"burton <path>\")"
 
 [[replace]]
 file = "crates/cli/src/main.rs"

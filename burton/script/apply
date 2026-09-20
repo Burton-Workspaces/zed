@@ -277,6 +277,36 @@ def apply_branding_choke_points(root: Path, branding: dict, errors: list[str]) -
             True,
         ),
         (
+            "crates/cli/src/main.rs",
+            '["../libexec/zed-editor", "../lib/zed/zed-editor", "./zed"]',
+            f'["../libexec/{bin_name}-editor", "../lib/{bin_name}/{bin_name}-editor", "./{bin_name}"]',
+            False,
+        ),
+        (
+            "crates/cli/src/main.rs",
+            '["../Zed.exe", "../lib/zed/zed-editor.exe", "./zed.exe"]',
+            f'["../{app_name}.exe", "../lib/{bin_name}/{bin_name}-editor.exe", "./{bin_name}.exe"]',
+            False,
+        ),
+        (
+            "crates/cli/src/main.rs",
+            '.join("zed-editor")',
+            f'.join("{bin_name}-editor")',
+            False,
+        ),
+        (
+            "crates/cli/src/main.rs",
+            'Some("/app/libexec/zed-editor".into())',
+            f'Some("/app/libexec/{bin_name}-editor".into())',
+            False,
+        ),
+        (
+            "crates/cli/src/main.rs",
+            'flatpak_dir.join("libexec/zed-editor")',
+            f'flatpak_dir.join("libexec/{bin_name}-editor")',
+            False,
+        ),
+        (
             "crates/windows_resources/src/windows_resources.rs",
             '("app-icon.ico", "Zed"),',
             f'("app-icon.ico", "{names["stable"]}"),',
